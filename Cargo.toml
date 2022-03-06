@@ -6,3 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bellman-bignat = {package = "bellman-bignat", git ="https://github.com/alex-ozdemir/bellman-bignat", branch = "master"}
+rug = {version = "1.15.0", default-features = false, features = ["integer", "serde", "rand"]}
+num-primes ="0.3.0"
