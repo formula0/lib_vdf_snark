@@ -9,6 +9,7 @@ edition = "2021"
 bellman-bignat = {package = "bellman-bignat", git ="https://github.com/alex-ozdemir/bellman-bignat", branch = "master"}
 rug = {version = "1.15.0", default-features = false, features = ["integer", "serde", "rand"]}
 num-primes ="0.3.0"
+sapling-crypto = { package = "sapling-crypto_ce", git = "https://github.com/alex-ozdemir/sapling-crypto", branch = "bls12-poseidon" }
 
 [dev-dependencies]
 poseidon-rs = "0.0.8"

@@ -18,6 +18,26 @@ const TIME_BASE: usize = 2;
 const TIME_ELEMENT_SIZE: u32 = 11;  //2^11 = 2048
 const TIME_MAX :usize = 30;
 
+pub mod zkp;
+pub mod util;
+
+// Option
+use sapling_crypto::bellman::SynthesisError;
+trait OptionExt<T> {
+    fn grab(&self) -> Result<&T, SynthesisError>;
+    fn grab_mut(&mut self) -> Result<&mut T, SynthesisError>;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    fn grab(&self) -> Result<&T, SynthesisError> {
+        self.as_ref().ok_or(SynthesisError::AssignmentMissing)
+    }
+
+    fn grab_mut(&mut self) -> Result<&mut T, SynthesisError> {
+        self.as_mut().ok_or(SynthesisError::AssignmentMissing)
+    }
+}
+
 pub struct TrapdoorVDF {
     pub group: RsaGroup,
     pub trapdoor: Integer,
