@@ -20,6 +20,7 @@ const TIME_MAX :usize = 30;
 
 pub mod zkp;
 pub mod util;
+pub mod rsa_proof;
 
 // for Test with quickcheck
 #[cfg(test)]
