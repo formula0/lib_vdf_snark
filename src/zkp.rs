@@ -118,10 +118,12 @@ pub fn alloc<CS>(cs: CS, value: Option<&Self::Value>, access: Self::Access, para
 #[cfg(test)]
 mod tests{
 
+
     use super::{Reduced, proof_of_exp, base_to_product};
 
     use std::str::FromStr;
 
+    use quickcheck::{TestResult};
     use sapling_crypto::circuit::test::TestConstraintSystem;
     use sapling_crypto::bellman::pairing::bn256::Bn256;
     use sapling_crypto::bellman::pairing::Engine;
@@ -319,6 +321,50 @@ where
         let g = RsaGroup::from_strs("2", "17");
         let res = base_to_product(&g, &b, &l, xs.iter());
         assert_eq!(res, Integer::from(1usize));
+    }
+
+
+    
+
+    #[quickcheck]
+    fn qc_proof_of_exp(b: u8, x0: u8, x1: u8, x2: u8, l: u8) -> TestResult {
+        if b < 1 {
+            return TestResult::discard();
+        }
+        if l < 2 {
+            return TestResult::discard();
+        }
+
+        let b = format!("{}",b);
+        let x0 = format!("{}", x0);
+        let x1 = format!("{}", x1);
+        let x2 = format!("{}", x2);
+        let l = format!("{}", l);
+        let m = "255";
+        let xs: &[&str] = &[&x0, &x1, &x2];
+
+        let circuit = PoE {
+            inputs: Some(PoEInputs{
+                b: &b,
+                exps: xs,
+                l: &l,
+                m: &m,
+                res: None,
+            }),
+            params: PoEParams {
+                limb_width: 4,
+                n_limb_b: 2,
+                n_limb_e: 2,
+            }
+        };
+        let mut cs = TestConstraintSystem::<Bn256>::new();
+        circuit.synthesize(&mut cs).expect("Synthesis Failed");
+        if !cs.is_satisfied() {
+            println!("UNSAT: {:#?}", cs.which_is_unsatisfied())
+        }
+
+        TestResult::from_bool(cs.is_satisfied())
+
     }
 
 }

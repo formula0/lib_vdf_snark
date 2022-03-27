@@ -21,6 +21,14 @@ const TIME_MAX :usize = 30;
 pub mod zkp;
 pub mod util;
 
+// for Test with quickcheck
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
+
+
 // Option
 use sapling_crypto::bellman::SynthesisError;
 trait OptionExt<T> {
