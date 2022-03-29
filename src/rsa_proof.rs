@@ -1,8 +1,16 @@
 use sapling_crypto::bellman::SynthesisError;
+
 use sapling_crypto::bellman::groth16::{
     generate_random_parameters, prepare_prover, prepare_verifying_key, verify_proof,
     ParameterSource, Parameters, Proof,
 };
+/*
+use bellman::groth16::{
+    generate_random_parameters, prepare_verifying_key, verify_proof,
+    ParameterSource, Parameters, Proof,
+};
+*/
+
 use sapling_crypto::bellman::pairing::Engine;
 use sapling_crypto::bellman::pairing::bls12_381::Bls12;
 use sapling_crypto::bellman::Circuit;
@@ -20,6 +28,7 @@ use super::OptionExt;
 use super::zkp::Reduced;
 use super::zkp::proof_of_exp;
 
+#[derive(Debug, Clone)]
 pub struct PoEInputs<'a> {
     pub b: &'a str,
     pub exps: &'a [&'a str],
@@ -28,12 +37,14 @@ pub struct PoEInputs<'a> {
     pub res: Option<&'a str>,
 }
 
+#[derive(Debug, Clone)]
 pub struct PoEParams {
     pub limb_width: usize,
     pub n_limb_b: usize,
     pub n_limb_e: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct PoE<'a> {
     inputs: Option<PoEInputs<'a>>,
     params: PoEParams,
@@ -159,13 +170,17 @@ pub fn setup<E: Engine>(group: &RsaQuotientGroup, poe: PoE)
         where E: Engine, C: Circuit<E>, R: Rng
     */
 
+    /*
     let params: Result<Parameters<E>, SynthesisError> = generate_random_parameters(poe, rng);
     println!("Params gen is okay: {:#?}", params.is_ok());
     assert!(params.is_ok());
 
     params
+    */
+    unimplemented!()
 }
 
+/*
 pub fn prove<E, C, R, P: ParameterSource<E>>(poe: PoE, params: P, rng: &mut R) 
 -> Result<Proof<E>, SynthesisError>
 where
@@ -180,6 +195,7 @@ where
     let proof = prover.create_proof(params, r, s)?;
     Ok(proof)
 }
+*/
 
 pub fn verify<E>(proof: &Proof<E>, params:&Parameters<E>, inputs: &[E::Fr] ) 
 -> Result<bool, SynthesisError>
@@ -200,3 +216,43 @@ where
 
 }
 
+
+#[cfg(test)]
+mod tests {
+
+    use bellman_bignat::group::RsaQuotientGroup;
+    
+    use sapling_crypto::bellman::pairing::bls12_381::Bls12;
+
+    use super::{PoE, PoEInputs, PoEParams};
+    const RSA_2048: &str = "25195908475657893494027183240048398571429282126204032027777137836043662020707595556264018525880784406918290641249515082189298559149176184502808489120072844992687392807287776735971418347270261896375014971824691165077613379859095700097330459748808428401797429100642458691817195118746121515172654632282216869987549182422433637259085141865462043576798423387184774447920739934236584823824281198163815010674810451660377306056201619676256133844143603833904414952634432190114657544454178424020924616515723350778707749817125772467962926386356373289912154831438167899885040445364023527381951378636564391212010397122822120720357";
+
+    use super::{setup};
+
+    #[test]
+    fn poe_simple() {
+
+        let group = RsaQuotientGroup::from_strs("2", RSA_2048 );
+        let testPoe = PoE {
+            params: PoEParams {
+                limb_width : 4,
+                n_limb_b : 2,
+                n_limb_e : 1,
+            },
+            inputs: Some(
+                PoEInputs {
+                    b: "1",
+                    m: "255",
+                    exps: &["1"],
+                    l: "15",
+                    res: Some("1"),
+                }),
+        };
+/*
+pub fn setup<E: Engine>(group: &RsaQuotientGroup, poe: PoE) -> Result<Parameters<E>, SynthesisError> 
+*/
+        let params = setup::<Bls12>(&group, testPoe.clone()).unwrap();
+
+        println!("Help!!!...");
+    }
+}

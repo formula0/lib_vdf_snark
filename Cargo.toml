@@ -10,7 +10,10 @@ bellman-bignat = {package = "bellman-bignat", git ="https://github.com/alex-ozde
 rug = {version = "1.15.0", default-features = false, features = ["integer", "serde", "rand"]}
 num-primes ="0.3.0"
 sapling-crypto = { package = "sapling-crypto_ce", git = "https://github.com/alex-ozdemir/sapling-crypto", branch = "bls12-poseidon" }
-rand = "0.4"
+rand = "0.8"
+pairing = "0.14"
+
+bellman = "0.11"
 
 
 [dev-dependencies]
@@ -29,3 +32,8 @@ dusk-plonk = {version="0.10", default-features = false, features = ["alloc"]}
 quickcheck = "0.8"
 quickcheck_macros ="0.8"
 color-backtrace = {version ="0.2"}
+
+# mimc test
+bls12_381 = "0.6"
+ff = "0.11"
+bellman = "0.11"
