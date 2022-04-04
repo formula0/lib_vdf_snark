@@ -10,11 +10,11 @@ bellman-bignat = {package = "bellman-bignat", git ="https://github.com/alex-ozde
 rug = {version = "1.15.0", default-features = false, features = ["integer", "serde", "rand"]}
 num-primes ="0.3.0"
 sapling-crypto = { package = "sapling-crypto_ce", git = "https://github.com/alex-ozdemir/sapling-crypto", branch = "bls12-poseidon" }
-rand = "0.8"
+rand = "0.4"
 pairing = "0.14"
 
 bellman = "0.11"
-
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 poseidon-rs = "0.0.8"
