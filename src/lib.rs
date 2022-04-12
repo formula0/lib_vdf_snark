@@ -1,12 +1,11 @@
-
 use std::str::FromStr;
 use std::thread::current;
 use std::time::Instant;
 
-use bellman_bignat::group::{RsaQuotientGroup, SemiGroup, RsaGroup}; 
-use bellman_bignat::util::bench::Engine;
-use bellman_bignat::hash::{Hasher, circuit::CircuitHasher};
-use num_primes::{BigUint, Generator};
+use bellman_bignat::group::{RsaGroup, SemiGroup};
+use num_bigint::{BigUint, BigInt};
+
+use num_primes::Generator;
 use rug::Integer;
 use rug::ops::Pow;
 
@@ -18,9 +17,10 @@ const TIME_BASE: usize = 2;
 const TIME_ELEMENT_SIZE: u32 = 11;  //2^11 = 2048
 const TIME_MAX :usize = 30;
 
-pub mod zkp;
 pub mod util;
-pub mod rsa_proof;
+pub mod poe_zkp;
+
+
 
 // for Test with quickcheck
 #[cfg(test)]
@@ -55,7 +55,11 @@ pub struct TrapdoorVDF {
 impl TrapdoorVDF {
 
     pub fn setup(group:&str, modulus: &str) -> Self {
-        let g = RsaGroup::from_strs(group, modulus);
+        //let g = RsaGroup::from_strs(group, modulus);
+        let g = RsaGroup { 
+            g: BigUint::from(2usize), 
+            m: BigUint::from_str(RSA_2048).unwrap(),
+        };
         // bits : 2^t (ex. t = 11 , 2^11 = 2048)
         //let time_exp = g.power(&time_base, &Integer::from_str(t_bits).unwrap());
     
@@ -73,7 +77,10 @@ impl TrapdoorVDF {
         let N = p.clone() * q.clone();
         let totient = (p.clone() - 1usize) * (q.clone() - 1usize);
 
-        let group = RsaGroup::from_strs(g, N.to_string().as_str());
+        let group = RsaGroup {
+            g: BigUint::from_str(g).unwrap(),
+            m: BigUint::from_str(N.to_string().as_str()).unwrap(),
+        };
 
         //println!("totient:{}", totient);
 
@@ -98,7 +105,8 @@ impl TrapdoorVDF {
             acc *= x;
         }
         acc /= l;
-        let res = g.power(b, &acc);
+        //let res = g.power(b, &acc);
+        let res = g.power(b, &BigUint::from(acc.to_u32().unwrap()));
         //println!("bits in exp : {}", acc.capacity());
         res
     }
@@ -115,20 +123,25 @@ impl TrapdoorVDF {
 
         if current_time > TIME_ELEMENT_SIZE {
             let exp = u32::pow(base_two, TIME_ELEMENT_SIZE);
-            let time_exp = self.group.power(&base, &Integer::from(exp)); 
+            let time_exp = self.group.power(
+                                    &BigUint::from(base.to_u32().unwrap()), 
+                                    &BigUint::from(exp)); 
             
             current_time -= Integer::from(TIME_ELEMENT_SIZE);
             let add_exp = u32::pow(base_two,Integer::to_u32(&current_time).unwrap());
             //result.push( Integer::from(add_exp));
             result = vec![
-                time_exp;
+                Integer::from_str(time_exp.to_string().as_str()).unwrap();
                 add_exp as usize
             ]
 
         } else {
             let exp = u32::pow(base_two, Integer::to_u32(&time).unwrap());
-            let time_exp = self.group.power(&base, &Integer::from(exp));
-            result.push(time_exp);
+            //let time_exp = self.group.power(&base, &Integer::from(exp));
+            let time_exp = self.group.power(
+                &BigUint::from(base.to_u32().unwrap()), 
+                &BigUint::from(exp)); 
+            result.push(Integer::from_str(time_exp.to_string().as_str()).unwrap());
 
         }
 
@@ -174,7 +187,9 @@ impl TrapdoorVDF {
         let b = Integer::from_str(base).unwrap();
 
         //Self::rsa_exponent(&self.group, &b, &Integer::from(1usize), xs.iter())
-        Self::rsa_exponent(&self.group, &b, &Integer::from(1usize), xs_totient.iter())
+        let exp = Self::rsa_exponent(&self.group, &BigUint::from_str(base).unwrap(), &Integer::from(1usize), xs.iter());
+        Integer::from_str(BigUint::to_string(&exp).as_str()).unwrap()
+        
     }
 
     pub fn eval(&self, base: &str, time: &str) -> Integer {
@@ -197,10 +212,9 @@ impl TrapdoorVDF {
         let xs = self.calculate_exp(time_base, time_exp);
         //println!("xs'0 size: {}", xs[0].capacity());
 
-        let b = Integer::from_str(base).unwrap();
-
-        Self::rsa_exponent(&self.group, &b, &Integer::from(1usize), xs.iter())
-
+        //let b = Integer::from_str(base).unwrap();
+        let exp = Self::rsa_exponent(&self.group, &BigUint::from_str(base).unwrap(), &Integer::from(1usize), xs.iter());
+        Integer::from_str(BigUint::to_string(&exp).as_str()).unwrap()
     }
 
 }
@@ -228,7 +242,7 @@ mod tests {
     I: Iterator<Item = &'a Integer> 
     {
         // compute 'b^prod(xs) % m
-        let mut acc = Integer::from(1);
+        let mut acc = Integer::from(1usize);
         for x in xs {
             acc *= x;
         }
@@ -236,7 +250,7 @@ mod tests {
 
         println!("acc in exp : {}", acc.capacity());
 
-        g.power(b, &acc)
+        g.power(b, &BigUint::from_str(acc.to_string().as_str()).unwrap())
     }
 
     #[test]
@@ -252,9 +266,13 @@ mod tests {
         ];
         println!("xs'0 size: {}", xs[0].capacity());
 
-        let g = RsaGroup::from_strs("2", RSA_2048);
+        // let g = RsaGroup::from_strs("2", RSA_2048);
+        let g = RsaGroup {
+            g: BigUint::from_str("2").unwrap(),
+            m: BigUint::from_str(RSA_2048).unwrap(),
+        };
         let start = Instant::now();
-        let res = rsa_exponent(&g, &b, &l, xs.iter());
+        let res = rsa_exponent(&g, &BigUint::from_str(b.to_string().as_str()).unwrap(), &l, xs.iter());
         let duration = start.elapsed();
         println!("{:?} .. {}", duration, res);
     }
@@ -273,7 +291,12 @@ mod tests {
         // println!("N : {}", N_str);
 
         //let g = RsaGroup::from_strs("1337", N_str.as_str());
-        let g = RsaGroup::from_strs("2", N_str.as_str());
+        //let g = RsaGroup::from_strs("2", N_str.as_str());
+        let g = RsaGroup {
+            g: BigUint::from_str("2").unwrap(),
+            m: BigUint::from_str(N_str.as_str()).unwrap(),
+        };
+
         let b = Integer::from(2usize);
         //let l = Integer::from_str(Generator::new_prime(3).to_string().as_str()).unwrap();
         let l = Integer::from(1usize);
@@ -281,7 +304,7 @@ mod tests {
             Integer::from_str(Generator::new_prime(2048).to_string().as_str()).unwrap()
         ];
         let eval_time = Instant::now();
-        let res = rsa_exponent(&g, &b, &l, xs.iter());
+        let res = rsa_exponent(&g, &BigUint::from_str(b.to_string().as_str()).unwrap(), &l, xs.iter());
         let eval_duration = eval_time.elapsed();
         println!("xs : {:?}", &xs);
         println!("res [{:?}] : {}", eval_duration ,&res);
@@ -299,7 +322,7 @@ mod tests {
             mod_xs.clone()
         ];
         let trapdoor_time = Instant::now();
-        let res_mod = rsa_exponent(&g, &b, &l, xs_totient.iter());
+        let res_mod = rsa_exponent(&g, &BigUint::from_str(b.to_string().as_str()).unwrap(), &l, xs_totient.iter());
         let trap_duration = trapdoor_time.elapsed();
         println!("res_mod [{:?}] : {}", trap_duration, res_mod);
     }
@@ -317,7 +340,11 @@ mod tests {
         let N_str = N.clone().to_string();
 //        println!("N : {}", N_str);
 
-        let g = RsaGroup::from_strs("2", N_str.as_str());
+        //let g = RsaGroup::from_strs("2", N_str.as_str());
+        let g = RsaGroup {
+            g: BigUint::from_str("2").unwrap(),
+            m: BigUint::from_str(N_str.as_str()).unwrap(),
+        };
         let b = Integer::from(2usize);
         //let l = Integer::from_str(Generator::new_prime(3).to_string().as_str()).unwrap();
         let l = Integer::from(1usize);
@@ -325,7 +352,7 @@ mod tests {
             //Integer::from_str(Generator::new_prime(7).to_string().as_str()).unwrap()
             Integer::from_str("10297").unwrap()
         ];
-        let res = rsa_exponent(&g, &b, &l, xs.iter());
+        let res = rsa_exponent(&g, &BigUint::from_str(b.to_string().as_str()).unwrap(), &l, xs.iter());
         println!("xs : {:?}", &xs);
         println!("res : {}",&res);
 
@@ -341,7 +368,7 @@ mod tests {
         let xs_totient = vec![
             mod_xs.clone()
         ];
-        let res_mod = rsa_exponent(&g, &b, &l, xs_totient.iter());
+        let res_mod = rsa_exponent(&g, &BigUint::from_str(b.to_string().as_str()).unwrap(), &l, xs_totient.iter());
         println!("res_mod : {}", res_mod);
     }
 }

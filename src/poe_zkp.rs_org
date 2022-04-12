@@ -1,0 +1,179 @@
+use std::rc::Rc;
+
+use bellman_bignat::gadget::Gadget;
+use num_bigint::BigUint;
+
+use sapling_crypto::bellman::groth16::{ generate_random_parameters, }; 
+use sapling_crypto::circuit::num::AllocatedNum;
+use sapling_crypto::poseidon::QuinticSBox;
+use sapling_crypto::bellman::{Circuit};
+use sapling_crypto::bellman::pairing::ff::{PrimeField};
+
+use bellman_bignat::group::{RsaGroup, CircuitRsaGroup, CircuitRsaGroupParams} ;
+use bellman_bignat::rsa_set::{IntSet, NaiveExpSet};
+use bellman_bignat::set::{Set, CircuitSet, CircuitSetParams};
+use bellman_bignat::hash::{HashDomain, helper};
+
+use sapling_crypto::bellman::{ConstraintSystem, SynthesisError};
+
+use sapling_crypto::poseidon::{PoseidonEngine};
+
+use crate::OptionExt;
+
+pub struct PoEBenchInputs<E, Inner> 
+where
+    E: PoseidonEngine<SBox = QuinticSBox<E>>,
+    Inner: IntSet,
+{
+    pub initial_state: Set<E, Inner>,
+    pub final_digest: BigUint,
+
+    // base, modulus : &'a str,  exponentials : &'a [&'a str], result : Option<'a str> 
+    pub to_insert: Vec<Vec<E::Fr>>,
+}
+
+impl<E, Inner> PoEBenchInputs<E, Inner>
+where
+    E: PoseidonEngine<SBox = QuinticSBox<E>>,
+    Inner: IntSet<G = RsaGroup>,
+{
+    pub fn from_counts(
+        n_inserted: usize,
+        item_len: usize,
+        hash: Rc<E::Params>,
+        n_bits_elem: usize,
+        group: RsaGroup,
+    ) -> Self {
+        let inserted_items: Vec<Vec<String>> = (0..n_inserted)
+            .map(|i| {
+                (0..item_len)
+                    .map(|j| format!("1{:06}{:03}", i, j))
+                    .collect()
+            })
+            .collect();
+        
+        Self::new(
+            inserted_items,
+            hash,
+            n_bits_elem,
+            group,
+        )
+    }
+
+    pub fn new(
+        inserted_items: Vec<Vec<String>>,
+        hash: Rc<E::Params>,
+        n_bits_elem: usize,
+        group: RsaGroup,
+    ) -> Self{
+
+        let inserted: Vec<Vec<E::Fr>> = inserted_items
+                        .iter()
+                        .map(|i| i.iter().map(|j| E::Fr::from_str(j).unwrap()).collect())
+                        .collect();
+        let hash_domain = HashDomain {
+            n_bits: n_bits_elem,
+            n_trailing_ones: 1,
+        };
+
+        let inserted_hashes = inserted
+                        .iter()
+                        .map(|xs| helper::hash_to_rsa_element(&xs, &hash_domain, &hash));
+        
+        let untouched_hashes = inserted_hashes.clone();
+
+        //..
+        let final_digest = untouched_hashes
+                    .chain(inserted_hashes)
+                    .fold(group.g.clone(), |g, i| g.modpow(&i, &group.m));
+        
+        
+        
+        
+    }
+}
+
+pub struct PoEBenchParams<E: PoseidonEngine> {
+    pub group: RsaGroup,
+    pub limb_width: usize,
+    pub n_bits_base: usize,
+    pub n_bits_elem: usize,
+    pub hash:Rc<E::Params>,
+
+    pub n_inserts: usize,
+    pub item_size: usize,
+
+}
+
+pub struct PoEBench<E, Inner>
+where
+    E: PoseidonEngine<SBox = QuinticSBox<E>>,
+    Inner: IntSet,
+{
+    pub inputs: Option<PoEBenchInputs<E, Inner>>,
+    pub params: PoEBenchParams<E>,
+}
+
+impl<E> Circuit<E> for PoEBench<E, NaiveExpSet<RsaGroup>>
+where
+    E: PoseidonEngine<SBox = QuinticSBox<E>>,
+{
+    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        println!("Constructing Group..");
+        let raw_group = self
+                        .inputs
+                        .as_ref()
+                        .map(|s| s.initial_state.group().clone());
+        
+        let group = CircuitRsaGroup::alloc(
+                    cs.namespace(|| "group"), 
+                    raw_group.as_ref(),
+                    (),
+                    &CircuitRsaGroupParams {
+                        limb_width: self.params.limb_width,
+                        n_limbs: self.params.n_bits_base / self.params.limb_width,
+                    }
+                )?;
+        group.inputize(cs.namespace(||"group input"))?;
+
+        println!("Constructing Set..");
+        let set: CircuitSet<E, CircuitRsaGroup<E>, NaiveExpSet<RsaGroup>> 
+        = CircuitSet::alloc(
+            cs.namespace(|| "set init"),
+            self.inputs.as_ref().map(|is| &is.initial_state),
+            group,
+            &CircuitSetParams {
+                hash: self.params.hash.clone(),
+                n_bits: self.params.n_bits_elem,
+                limb_width: self.params.limb_width,
+            },
+        )?;
+        set.inputize(cs.namespace(|| "initial_state input"))?;
+
+        println!("Allocating Insertions...");
+        let insertions = (0..self.params.n_inserts)
+            .map((|i| {
+                (0..self.params.item_size)
+                .map(|j|{
+                    AllocatedNum::alloc(
+                        cs.namespace(|| format!("insert {} {}", i, j)),
+                        || {
+                            Ok(**self.inputs.grab()?.to_insert.get(i).grab()?
+                                .get(j).grab()?)
+                        })
+                })
+                .collect::<Result<Vec<_>,_>>()
+            })
+            .collect::<Result<Vec<Vec<AllocatedNum<E>>>,SynthesisError>>()?;
+
+
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+
+mod tests {
+
+}
