@@ -32,7 +32,7 @@ where
 {
     pub inputs: Option<PoEBenchInputs<E,Inner>>,
     pub params: PoEBenchParams<E>,
-}
+} 
 
 impl<E> Circuit<E> for PoEBench<E, NaiveExpSet<RsaGroup>>
 where 
@@ -65,7 +65,7 @@ where
         )?;
         group.inputize(cs.namespace(|| "initial_state input.."))?;
 
-        
+
         Ok(())
                                     
     }

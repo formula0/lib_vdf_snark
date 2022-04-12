@@ -103,7 +103,7 @@ pub struct PoEBenchParams<E: PoseidonEngine> {
     pub n_inserts: usize,
     pub item_size: usize,
 
-}
+} 
 
 pub struct PoEBench<E, Inner>
 where
